@@ -1,21 +1,26 @@
 [build]
+  # Base directory
   base = "."
-  # Vite build (don’t set NODE_ENV=production here)
-  command = "npm ci && npm run build:prod"
+  
+  # Build command - use npm install instead of npm ci
+  command = "npm install && npm run build"
+  
+  # Directory to publish
   publish = "dist"
 
 [build.environment]
+  # Node.js version
   NODE_VERSION = "18"
-  # Keep development env so Netlify installs devDependencies
-  NODE_ENV = "development"
+  # Build environment
+  NODE_ENV = "production"
 
-# Redirect rules for SPA (React Router)
+# Redirect rules for SPA
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# Security headers
+# Headers for security and performance
 [[headers]]
   for = "/*"
   [headers.values]
@@ -37,12 +42,12 @@
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
 
-# Environment contexts
+# Environment variables (set these in Netlify dashboard)
 [context.production.environment]
-  NODE_ENV = "development"
-
+  NODE_ENV = "production"
+  
 [context.deploy-preview.environment]
   NODE_ENV = "development"
-
+  
 [context.branch-deploy.environment]
   NODE_ENV = "development"

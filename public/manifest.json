@@ -1,0 +1,25 @@
+{
+  "name": "Quizly - Crypto Quiz Telegram Mini App",
+  "short_name": "Quizly",
+  "description": "Quizly - Crypto Quiz Game with USDT Rewards and Tournaments",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f0f23",
+  "theme_color": "#00BFFF",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/logo.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["games", "entertainment", "education"],
+  "lang": "en",
+  "dir": "ltr"
+}

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background Circle -->
+  <circle cx="256" cy="256" r="256" fill="#0f0f23"/>
+  
+  <!-- Outer Ring -->
+  <circle cx="256" cy="256" r="220" fill="none" stroke="#00BFFF" stroke-width="8"/>
+  
+  <!-- Inner Ring -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#FFD700" stroke-width="6"/>
+  
+  <!-- Q Letter -->
+  <text x="256" y="320" font-family="Arial, sans-serif" font-size="200" font-weight="bold" fill="#00BFFF" text-anchor="middle">Q</text>
+  
+  <!-- Crypto Symbol -->
+  <circle cx="380" cy="180" r="25" fill="#FFD700"/>
+  <text x="380" y="190" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#0f0f23" text-anchor="middle">₿</text>
+  
+  <!-- Quiz Symbol -->
+  <circle cx="380" cy="320" r="20" fill="#10b981"/>
+  <text x="380" y="328" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="white" text-anchor="middle">?</text>
+  
+  <!-- Decorative Elements -->
+  <circle cx="150" cy="150" r="3" fill="#00BFFF" opacity="0.7"/>
+  <circle cx="380" cy="380" r="3" fill="#FFD700" opacity="0.7"/>
+  <circle cx="150" cy="380" r="3" fill="#10b981" opacity="0.7"/>
+  <circle cx="380" cy="150" r="3" fill="#00BFFF" opacity="0.7"/>
+</svg>

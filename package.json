@@ -1,0 +1,52 @@
+{
+  "name": "quizly",
+  "version": "1.0.0",
+  "description": "Quizly - Telegram Mini App for Crypto Quiz Game with Tournaments and USDT Rewards",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:prod": "NODE_ENV=production vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext js,jsx,ts,tsx",
+    "lint:fix": "eslint . --ext js,jsx,ts,tsx --fix",
+    "type-check": "tsc --noEmit",
+    "deploy:setup": "node deploy-setup.js",
+    "deploy:test": "npm run build:prod && npm run preview",
+    "deploy:netlify": "npm run build:prod && netlify deploy --prod",
+    "deploy:vercel": "npm run build:prod && vercel --prod"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "framer-motion": "^10.16.4",
+    "lucide-react": "^0.263.1",
+    "mongodb": "^6.20.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.8.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.15",
+    "@types/react-dom": "^18.2.7",
+    "@vitejs/plugin-react": "^4.0.3",
+    "autoprefixer": "^10.4.14",
+    "eslint": "^8.45.0",
+    "eslint-plugin-react": "^7.32.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.3",
+    "postcss": "^8.4.27",
+    "tailwindcss": "^3.3.3",
+    "typescript": "^5.0.2",
+    "vite": "^5.0.0"
+  },
+  "keywords": [
+    "telegram",
+    "mini-app",
+    "crypto",
+    "quiz",
+    "react",
+    "tailwind"
+  ],
+  "author": "Crypto Quiz Team",
+  "license": "MIT"
+}

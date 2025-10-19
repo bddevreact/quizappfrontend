@@ -1,6 +1,7 @@
 import dataService from './dataService'
 import appSettingsService from './appSettingsService'
 import telegramWebAppService from './telegramWebAppService'
+import adminDataService from './adminDataService'
 
 class DailyBonusService {
   constructor() {
@@ -235,16 +236,25 @@ class DailyBonusService {
     return tomorrow.toISOString()
   }
 
-  // Get total claimed amount
-  getTotalClaimed() {
+  // Get total claimed amount from database
+  async getTotalClaimed() {
     try {
-      const bonusData = localStorage.getItem(this.storageKey)
-      if (bonusData) {
-        const data = JSON.parse(bonusData)
-        return data.totalClaimed || 0
+      // Get user data to calculate total claimed
+      let userData = telegramWebAppService.getUserData()
+      if (!userData) {
+        userData = dataService.getUserData()
       }
-      return 0
+      
+      // Calculate total claimed from user's totalEarned and streak
+      const totalEarned = userData?.totalEarned || 0
+      const streak = userData?.streak || 0
+      
+      // Estimate daily bonus portion (this is approximate)
+      const dailyBonusPortion = Math.min(totalEarned * 0.1, streak * 1.0) // Rough estimate
+      
+      return dailyBonusPortion
     } catch (error) {
+      console.error('Error getting total claimed:', error)
       return 0
     }
   }
@@ -281,13 +291,10 @@ class DailyBonusService {
     }
   }
 
-  // Reset streak (admin function)
+  // Reset streak (admin function) - Database only
   async resetStreak(userId) {
     try {
-      localStorage.removeItem(this.lastClaimKey)
-      localStorage.removeItem(this.storageKey)
-      
-      // Update user data
+      // Update user data in database to reset streak
       const userData = dataService.getUserData()
       if (userData) {
         await dataService.updateUserData({
@@ -295,6 +302,7 @@ class DailyBonusService {
           streak: 0,
           lastBonusClaim: null
         })
+        console.log('✅ Streak reset successfully in database')
       }
 
       return {
@@ -310,18 +318,49 @@ class DailyBonusService {
     }
   }
 
-  // Get all users' daily bonus data (admin function)
+  // Get all users' daily bonus data (admin function) - From database
   async getAllUsersDailyBonusData() {
     try {
-      // This would typically fetch from backend
-      // For now, return mock data
+      // Get real data from adminDataService
+      const adminData = await adminDataService.getDashboardStats()
+      const users = await adminDataService.getAllUsers()
+      
+      // Calculate daily bonus statistics from real data
+      const totalUsers = users.length
+      const activeUsers = users.filter(user => {
+        const lastSeen = new Date(user.lastSeen || user.createdAt)
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+        return lastSeen > oneDayAgo
+      }).length
+      
+      const claimsToday = users.filter(user => {
+        const lastClaim = user.lastBonusClaim
+        if (!lastClaim) return false
+        const claimDate = new Date(lastClaim)
+        const today = new Date()
+        return claimDate.toDateString() === today.toDateString()
+      }).length
+      
+      const totalRewardsDistributed = users.reduce((sum, user) => {
+        // Estimate daily bonus portion of total earned
+        return sum + (user.totalEarned || 0) * 0.1
+      }, 0)
+      
+      const averageStreak = users.length > 0 
+        ? users.reduce((sum, user) => sum + (user.streak || 0), 0) / users.length 
+        : 0
+      
+      const topStreak = users.length > 0 
+        ? Math.max(...users.map(user => user.streak || 0))
+        : 0
+      
       return {
-        totalUsers: 150,
-        activeUsers: 45,
-        totalClaimsToday: 23,
-        totalRewardsDistributed: 45.50,
-        averageStreak: 3.2,
-        topStreak: 15
+        totalUsers,
+        activeUsers,
+        totalClaimsToday: claimsToday,
+        totalRewardsDistributed: Math.round(totalRewardsDistributed * 100) / 100,
+        averageStreak: Math.round(averageStreak * 10) / 10,
+        topStreak
       }
     } catch (error) {
       console.error('Error getting all users daily bonus data:', error)

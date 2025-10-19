@@ -24,7 +24,6 @@ import walletService from '../services/walletService'
 import appSettingsService from '../services/appSettingsService'
 import dailyBonusService from '../services/dailyBonusService'
 import telegramWebAppService from '../services/telegramWebAppService'
-import TelegramUserTest from '../components/TelegramUserTest'
 
 const Home = () => {
   const [userData, setUserData] = useState({})
@@ -449,8 +448,6 @@ const Home = () => {
           </div>
         )}
 
-        {/* Telegram User Test */}
-        <TelegramUserTest />
       </div>
     </div>
   )

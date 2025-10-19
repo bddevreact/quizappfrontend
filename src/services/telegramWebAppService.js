@@ -45,14 +45,17 @@ class TelegramWebAppService {
             console.log('🔄 Fetching user data from backend...');
             
             // Get user data from backend
-            const response = await fetch('https://updatequizapp-production.up.railway.app/api/telegram/webapp-init', {
+            const response = await fetch('https://updatequizapp-production.up.railway.app/api/telegram-webapp/webapp-init', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
                 initData: initData,
-                user: telegramUser,
+                user: {
+                  ...telegramUser,
+                  photo_url: telegramUser.photo_url || ''
+                },
                 referralCode: this.getReferralCode()
               })
             });

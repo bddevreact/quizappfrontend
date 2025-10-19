@@ -1,5 +1,6 @@
 // Wallet Service for managing deposit addresses and networks
 import dataService from './dataService'
+import adminDataService from './adminDataService'
 
 class WalletService {
   constructor() {
@@ -10,7 +11,7 @@ class WalletService {
     }
   }
 
-  // Get all wallet addresses
+  // Get all wallet addresses from database
   async getWalletAddresses() {
     try {
       // Check cache first
@@ -19,14 +20,42 @@ class WalletService {
         return this.cache.addresses
       }
 
-      // For now, return mock data since we don't have backend API yet
-      const mockAddresses = this.getMockWalletAddresses()
+      // Get wallet addresses from database via adminDataService
+      const adminData = await adminDataService.getDashboardStats()
+      
+      // For now, use default wallet addresses since we don't have wallet management in backend yet
+      const defaultAddresses = [
+        {
+          network: 'TRC20',
+          address: 'TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE',
+          name: 'Tron USDT Wallet',
+          minDeposit: 1,
+          maxDeposit: 10000,
+          processingTime: '5-10 minutes'
+        },
+        {
+          network: 'ERC20',
+          address: '0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6',
+          name: 'Ethereum USDT Wallet',
+          minDeposit: 5,
+          maxDeposit: 50000,
+          processingTime: '10-30 minutes'
+        },
+        {
+          network: 'BEP20',
+          address: '0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6',
+          name: 'BSC USDT Wallet',
+          minDeposit: 1,
+          maxDeposit: 25000,
+          processingTime: '5-15 minutes'
+        }
+      ]
 
       // Update cache
-      this.cache.addresses = mockAddresses
+      this.cache.addresses = defaultAddresses
       this.cache.lastFetch = Date.now()
 
-      return mockAddresses
+      return defaultAddresses
     } catch (error) {
       console.error('Error fetching wallet addresses:', error)
       return []

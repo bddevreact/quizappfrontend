@@ -18,18 +18,34 @@ class TelegramWebAppService {
     try {
       // Check if running in Telegram WebApp
       if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+        console.log('🚀 Initializing Telegram WebApp...');
+        
         // Initialize Telegram WebApp
         window.Telegram.WebApp.ready();
         window.Telegram.WebApp.expand();
+        
+        // Handle popup events to prevent errors
+        window.Telegram.WebApp.onEvent('popupOpened', () => {
+          console.log('📱 Telegram popup opened');
+        });
+        
+        window.Telegram.WebApp.onEvent('popupClosed', () => {
+          console.log('📱 Telegram popup closed');
+        });
 
         // Get user data from Telegram
         const telegramUser = window.Telegram.WebApp.initDataUnsafe?.user;
         const initData = window.Telegram.WebApp.initData;
 
+        console.log('📱 Telegram User Data:', telegramUser);
+        console.log('🔑 Init Data:', initData);
+
         if (telegramUser) {
           try {
+            console.log('🔄 Fetching user data from backend...');
+            
             // Get user data from backend
-            const response = await fetch('/api/telegram-webapp/webapp-init', {
+            const response = await fetch('https://updatequizapp-production.up.railway.app/api/telegram/webapp-init', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -41,19 +57,24 @@ class TelegramWebAppService {
               })
             });
 
+            console.log('📡 Backend Response Status:', response.status);
+
             if (!response.ok) {
               throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             const result = await response.json();
+            console.log('📊 Backend Response Data:', result);
 
             if (result.success) {
               this.user = result.data.user;
+              console.log('✅ User data loaded successfully:', this.user);
               
               // Store tokens
               if (result.data.tokens) {
                 localStorage.setItem('accessToken', result.data.tokens.accessToken);
                 localStorage.setItem('refreshToken', result.data.tokens.refreshToken);
+                console.log('🔐 Tokens stored successfully');
               }
 
               // Configure UI
@@ -88,10 +109,54 @@ class TelegramWebAppService {
               throw new Error(result.error?.message || 'Failed to initialize user');
             }
           } catch (apiError) {
-            console.error('API Error:', apiError);
-            // Fallback: show error but don't block the app
-            window.Telegram.WebApp.showAlert('Error loading user data. Please try again.');
-            this.isInitialized = true; // Allow app to continue
+            console.error('❌ API Error:', apiError);
+            
+            // Create user data from Telegram user info as fallback
+            const fallbackUser = {
+              userId: telegramUser.id.toString(),
+              telegramId: telegramUser.id.toString(),
+              telegramUsername: telegramUser.username || 'unknown',
+              telegramFullName: telegramUser.first_name + (telegramUser.last_name ? ` ${telegramUser.last_name}` : ''),
+              telegramPhotoUrl: telegramUser.photo_url || null,
+              username: telegramUser.username || telegramUser.first_name,
+              fullName: telegramUser.first_name + (telegramUser.last_name ? ` ${telegramUser.last_name}` : ''),
+              name: telegramUser.first_name + (telegramUser.last_name ? ` ${telegramUser.last_name}` : ''),
+              isTelegramUser: true,
+              isNewUser: true,
+              balance: 0,
+              availableBalance: 0,
+              playableBalance: 0,
+              bonusBalance: 0,
+              level: 1,
+              totalXP: 0,
+              xp: 0,
+              rank: 'Bronze',
+              joinDate: new Date().toISOString().split('T')[0],
+              questionsAnswered: 0,
+              averageScore: 0,
+              totalEarned: 0,
+              totalDeposited: 0,
+              totalWithdrawn: 0,
+              withdrawalEnabled: false,
+              isVerified: false,
+              // Add more fields that might be expected
+              tournamentsWon: 0,
+              streak: 0,
+              dailyBonusAvailable: true,
+              unreadNotifications: 0,
+              lastSeen: new Date().toISOString(),
+              hasDeposited: false
+            };
+            
+            this.user = fallbackUser;
+            console.log('🔄 Using fallback user data:', fallbackUser);
+            
+            // Don't show error alert, just use fallback data silently
+            this.isInitialized = true;
+            
+            if (this.callbacks.onUserData) {
+              this.callbacks.onUserData({ user: fallbackUser, isNewUser: true });
+            }
             
             if (this.callbacks.onError) {
               this.callbacks.onError(apiError);
@@ -101,11 +166,11 @@ class TelegramWebAppService {
               this.callbacks.onInitialized(true);
             }
             
-            return null;
+            return { user: fallbackUser, isNewUser: true };
           }
         } else {
           // No Telegram user data, but don't throw error - allow normal app usage
-          console.warn('No Telegram user data found, using fallback mode');
+          console.warn('⚠️ No Telegram user data found, using fallback mode');
           this.isInitialized = true;
           
           if (this.callbacks.onInitialized) {
@@ -116,6 +181,7 @@ class TelegramWebAppService {
         }
       } else {
         // Not running in Telegram WebApp, allow normal app usage
+        console.log('🌐 Not running in Telegram WebApp environment');
         this.isInitialized = true;
         
         if (this.callbacks.onInitialized) {
@@ -125,7 +191,7 @@ class TelegramWebAppService {
         return null;
       }
     } catch (error) {
-      console.error('Error initializing Telegram WebApp:', error);
+      console.error('❌ Error initializing Telegram WebApp:', error);
       this.error = error.message;
       
       if (this.callbacks.onError) {
@@ -181,7 +247,7 @@ class TelegramWebAppService {
   // Sync user data with backend
   async syncUserWithBackend(userData) {
     try {
-      const response = await fetch('/api/telegram-webapp/sync-user', {
+      const response = await fetch('https://updatequizapp-production.up.railway.app/api/telegram/sync-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

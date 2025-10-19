@@ -113,17 +113,7 @@ function AppContent() {
           }
         }
         
-        // Set up periodic data sync
-        const syncInterval = setInterval(async () => {
-          try {
-            await dataService.syncPendingData();
-          } catch (error) {
-            console.log('Sync error (non-blocking):', error.message);
-          }
-        }, 30000); // Sync every 30 seconds
-        
-        // Cleanup interval on unmount
-        return () => clearInterval(syncInterval);
+        console.log('✅ App initialized successfully');
       } catch (error) {
         console.error('Error initializing app:', error);
       } finally {

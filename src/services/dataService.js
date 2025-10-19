@@ -61,6 +61,18 @@ class DataService {
     }
   }
 
+  async updateUserBalance(balanceData) {
+    try {
+      const updatedUser = await mongoDBService.updateUserBalance(balanceData);
+      this.userData = updatedUser;
+      this.clearCache('user');
+      return updatedUser;
+    } catch (error) {
+      console.error('Error updating user balance:', error);
+      throw error;
+    }
+  }
+
   // Quiz Management
   async getQuestions(difficulty = 'easy', limit = 10) {
     const cacheKey = `questions_${difficulty}_${limit}`;
@@ -411,36 +423,17 @@ class DataService {
     }
   }
 
-  // Add transaction (database version)
+  // Add transaction (MongoDB only)
   async addTransaction(transaction) {
     try {
-      console.log('💰 Adding transaction:', transaction);
+      console.log('💰 Adding transaction to MongoDB:', transaction);
       
-      // Try to create transaction in database first
-      try {
-        const result = await mongoDBService.createTransaction(transaction);
-        console.log('✅ Transaction created successfully in database:', result);
-        return result;
-      } catch (dbError) {
-        console.log('⚠️ Database transaction creation failed, storing locally:', dbError.message);
-        
-        // Fallback: Store transaction in localStorage for later sync
-        const pendingTransactions = JSON.parse(localStorage.getItem('quizApp_pendingTransactions') || '[]');
-        const transactionWithId = {
-          ...transaction,
-          id: `local_${Date.now()}`,
-          timestamp: new Date().toISOString(),
-          synced: false
-        };
-        pendingTransactions.push(transactionWithId);
-        localStorage.setItem('quizApp_pendingTransactions', JSON.stringify(pendingTransactions));
-        
-        console.log('✅ Transaction stored locally, will sync when backend is available');
-        return transactionWithId;
-      }
+      const result = await mongoDBService.createTransaction(transaction);
+      console.log('✅ Transaction created successfully in MongoDB:', result);
+      return result;
     } catch (error) {
-      console.error('Error adding transaction:', error);
-      return false;
+      console.error('❌ Error adding transaction to MongoDB:', error);
+      throw error;
     }
   }
 
@@ -473,39 +466,11 @@ class DataService {
         lastQuizDifficulty: difficulty
       };
 
-      // Try to update user data in database first
-      try {
-        const result = await this.updateUserData(updatedUserData);
-        console.log('✅ Quiz completed successfully in database:', result);
-        
-        // Also update local data
-        this.userData = updatedUserData;
-        
-        return result;
-      } catch (dbError) {
-        console.log('⚠️ Database update failed, updating local data only:', dbError.message);
-        
-        // Fallback: Update local data and store in localStorage
-        this.userData = updatedUserData;
-        localStorage.setItem('quizApp_userData', JSON.stringify(updatedUserData));
-        
-        // Store quiz completion in localStorage for later sync
-        const quizCompletion = {
-          score,
-          totalQuestions,
-          difficulty,
-          reward,
-          timestamp: new Date().toISOString(),
-          synced: false
-        };
-        
-        const pendingCompletions = JSON.parse(localStorage.getItem('quizApp_pendingCompletions') || '[]');
-        pendingCompletions.push(quizCompletion);
-        localStorage.setItem('quizApp_pendingCompletions', JSON.stringify(pendingCompletions));
-        
-        console.log('✅ Quiz completed locally, will sync when backend is available');
-        return updatedUserData;
-      }
+      // Update user data in MongoDB database
+      const result = await this.updateUserData(updatedUserData);
+      console.log('✅ Quiz completed successfully in MongoDB:', result);
+      
+      return result;
     } catch (error) {
       console.error('Error completing quiz:', error);
       throw error;
@@ -534,90 +499,6 @@ class DataService {
     return Math.round(((currentAverage * (totalQuizzes - 1)) + newScore) / totalQuizzes);
   }
 
-  // Sync pending data with backend
-  async syncPendingData() {
-    try {
-      console.log('🔄 Syncing pending data with backend...');
-      
-      // Check if backend is available
-      await mongoDBService.checkBackendAvailability();
-      if (!mongoDBService.backendAvailable) {
-        console.log('⚠️ Backend not available for sync');
-        return false;
-      }
-      
-      // Sync pending quiz completions
-      const pendingCompletions = JSON.parse(localStorage.getItem('quizApp_pendingCompletions') || '[]');
-      if (pendingCompletions.length > 0) {
-        console.log(`📊 Syncing ${pendingCompletions.length} pending quiz completions...`);
-        
-        for (const completion of pendingCompletions) {
-          if (!completion.synced) {
-            try {
-              // Update user data with completion
-              const userData = this.getUserData();
-              const updatedUserData = {
-                ...userData,
-                questionsAnswered: (userData.questionsAnswered || 0) + completion.totalQuestions,
-                totalXP: (userData.totalXP || 0) + Math.round(completion.score * 0.1),
-                averageScore: this.calculateAverageScore(userData, completion.score),
-                totalEarned: (userData.totalEarned || 0) + completion.reward,
-                playableBalance: (userData.playableBalance || 0) + completion.reward,
-                availableBalance: (userData.availableBalance || 0) + completion.reward,
-                lastQuizDate: completion.timestamp,
-                lastQuizScore: completion.score,
-                lastQuizDifficulty: completion.difficulty
-              };
-              
-              await this.updateUserData(updatedUserData);
-              completion.synced = true;
-              console.log('✅ Synced quiz completion:', completion.timestamp);
-            } catch (error) {
-              console.log('⚠️ Failed to sync quiz completion:', error.message);
-            }
-          }
-        }
-        
-        // Update localStorage with synced completions
-        const syncedCompletions = pendingCompletions.filter(c => c.synced);
-        const unsyncedCompletions = pendingCompletions.filter(c => !c.synced);
-        localStorage.setItem('quizApp_pendingCompletions', JSON.stringify(unsyncedCompletions));
-        
-        console.log(`✅ Synced ${syncedCompletions.length} quiz completions`);
-      }
-      
-      // Sync pending transactions
-      const pendingTransactions = JSON.parse(localStorage.getItem('quizApp_pendingTransactions') || '[]');
-      if (pendingTransactions.length > 0) {
-        console.log(`💰 Syncing ${pendingTransactions.length} pending transactions...`);
-        
-        for (const transaction of pendingTransactions) {
-          if (!transaction.synced) {
-            try {
-              await mongoDBService.createTransaction(transaction);
-              transaction.synced = true;
-              console.log('✅ Synced transaction:', transaction.id);
-            } catch (error) {
-              console.log('⚠️ Failed to sync transaction:', error.message);
-            }
-          }
-        }
-        
-        // Update localStorage with synced transactions
-        const syncedTransactions = pendingTransactions.filter(t => t.synced);
-        const unsyncedTransactions = pendingTransactions.filter(t => !t.synced);
-        localStorage.setItem('quizApp_pendingTransactions', JSON.stringify(unsyncedTransactions));
-        
-        console.log(`✅ Synced ${syncedTransactions.length} transactions`);
-      }
-      
-      return true;
-    } catch (error) {
-      console.error('Error syncing pending data:', error);
-      return false;
-    }
-  }
-
   // Real-time Updates (placeholder for future WebSocket implementation)
   subscribeToUpdates(callback) {
     // This would be implemented with WebSocket connection
@@ -627,6 +508,97 @@ class DataService {
   unsubscribeFromUpdates() {
     // This would be implemented with WebSocket disconnection
     console.log('Real-time updates unsubscription placeholder');
+  }
+  // Get user goals
+  getGoals() {
+    try {
+      // Return mock goals for now
+      return [
+        {
+          id: 'goal-1',
+          title: 'Complete 10 Quizzes',
+          description: 'Complete 10 quizzes to earn bonus points',
+          target: 10,
+          current: 0,
+          reward: 5.0,
+          completed: false
+        },
+        {
+          id: 'goal-2',
+          title: 'Reach Level 5',
+          description: 'Reach level 5 to unlock new features',
+          target: 5,
+          current: 1,
+          reward: 10.0,
+          completed: false
+        },
+        {
+          id: 'goal-3',
+          title: 'Earn $50',
+          description: 'Earn $50 total to unlock premium features',
+          target: 50,
+          current: 0,
+          reward: 25.0,
+          completed: false
+        }
+      ];
+    } catch (error) {
+      console.error('Error getting goals:', error);
+      return [];
+    }
+  }
+
+  // Get transaction limits
+  getTransactionLimits() {
+    try {
+      return {
+        minDeposit: 10.0,
+        maxDeposit: 1000.0,
+        minWithdrawal: 20.0,
+        maxWithdrawal: 500.0,
+        dailyLimit: 2000.0,
+        monthlyLimit: 10000.0
+      };
+    } catch (error) {
+      console.error('Error getting transaction limits:', error);
+      return {
+        minDeposit: 10.0,
+        maxDeposit: 1000.0,
+        minWithdrawal: 20.0,
+        maxWithdrawal: 500.0,
+        dailyLimit: 2000.0,
+        monthlyLimit: 10000.0
+      };
+    }
+  }
+
+  // Get wallet addresses
+  getWalletAddresses() {
+    try {
+      return [
+        {
+          id: 'btc-1',
+          network: 'Bitcoin',
+          address: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
+          type: 'deposit'
+        },
+        {
+          id: 'eth-1',
+          network: 'Ethereum',
+          address: '0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6',
+          type: 'deposit'
+        },
+        {
+          id: 'usdt-1',
+          network: 'Tether',
+          address: '0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6',
+          type: 'deposit'
+        }
+      ];
+    } catch (error) {
+      console.error('Error getting wallet addresses:', error);
+      return [];
+    }
   }
 }
 

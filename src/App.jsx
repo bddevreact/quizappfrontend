@@ -33,6 +33,7 @@ import AdminReferrals from './pages/admin/AdminReferrals';
 import AdminDailyBonus from './pages/admin/AdminDailyBonus';
 import AdminWalletSettings from './pages/admin/AdminWalletSettings';
 import AdminAppSettings from './pages/admin/AdminAppSettings';
+import TelegramDebugInfo from './components/TelegramDebugInfo';
 
 function AppContent() {
   const location = useLocation();
@@ -65,25 +66,34 @@ function AppContent() {
 
         if (isTelegram) {
           try {
+            console.log('🚀 Setting up Telegram WebApp callbacks...');
+            
             // Set up callbacks
             telegramWebAppService.setCallbacks({
               onUserData: (data) => {
+                console.log('📱 Telegram User Data Callback:', data);
                 setUser(data.user);
                 setTelegramData(data);
               },
               onError: (error) => {
-                console.error('Telegram WebApp Error:', error);
+                console.error('❌ Telegram WebApp Error:', error);
               },
               onInitialized: (status) => {
-                console.log('Telegram WebApp Initialized:', status);
+                console.log('✅ Telegram WebApp Initialized:', status);
               }
             });
 
             // Initialize Telegram WebApp
+            console.log('🔄 Initializing Telegram WebApp...');
             const result = await telegramWebAppService.initialize();
+            console.log('📊 Telegram WebApp Result:', result);
+            
             if (result) {
               setUser(result.user);
               setTelegramData(result);
+              console.log('✅ Telegram user data set in App state');
+            } else {
+              console.log('⚠️ No Telegram user data received');
             }
           } catch (error) {
             console.error('Error initializing Telegram user:', error);
@@ -260,6 +270,9 @@ function AppContent() {
         </Routes>
       </main>
       {!isAdminRoute && <BottomNavbar user={user} />}
+      
+      {/* Debug Component */}
+      <TelegramDebugInfo />
     </div>
   );
 }

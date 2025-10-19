@@ -22,7 +22,7 @@ class MongoDBService {
     
     // For development, use a mock token if no token is available
     if (!this.token && import.meta.env.DEV) {
-      this.token = 'dev-token-for-testing';
+      this.token = 'dev-token-123';
       localStorage.setItem('accessToken', this.token);
     }
     
@@ -30,6 +30,7 @@ class MongoDBService {
       axios.defaults.headers.common['Authorization'] = `Bearer ${this.token}`;
     }
     
+    console.log('MongoDB Service initialized with baseURL:', this.baseURL);
     console.log('MongoDB Service initialized with URI:', this.mongoURI);
     
     // Check backend availability
@@ -73,8 +74,14 @@ class MongoDBService {
       
       this.backendAvailable = false;
       this.lastCheckTime = Date.now();
-      console.log('⚠️ Backend server not available, using mock data');
+      console.log('⚠️ Backend server not available');
       console.log('Backend check error:', error.message);
+      
+      // Check if it's a CORS error
+      if (error.message.includes('CORS') || error.message.includes('Access-Control-Allow-Origin')) {
+        console.log('🔧 CORS error detected - this should be fixed with the recent CORS update');
+      }
+      
       return false;
     }
   }
@@ -106,7 +113,7 @@ class MongoDBService {
       }
       
       // Ensure we have a token
-      const token = localStorage.getItem('accessToken');
+      const token = localStorage.getItem('accessToken') || 'dev-token-123';
       if (!token) {
         console.log('⚠️ No access token available');
         throw new Error('No access token available');
@@ -154,7 +161,7 @@ class MongoDBService {
       }
       
       // Ensure we have a token
-      const token = localStorage.getItem('accessToken');
+      const token = localStorage.getItem('accessToken') || 'dev-token-123';
       if (!token) {
         console.log('⚠️ No access token available');
         throw new Error('No access token available');
@@ -184,6 +191,54 @@ class MongoDBService {
       }
       
       console.error('Error updating user data:', error);
+      throw error;
+    }
+  }
+
+  async updateUserBalance(balanceData) {
+    try {
+      console.log('💰 Updating user balance:', balanceData);
+      
+      // Check backend availability first
+      await this.checkBackendAvailability();
+      
+      // If backend is not available, return error
+      if (!this.backendAvailable) {
+        console.log('⚠️ Backend not available - cannot update balance');
+        throw new Error('Backend not available');
+      }
+      
+      // Ensure we have a token
+      const token = localStorage.getItem('accessToken') || 'dev-token-123';
+      if (!token) {
+        console.log('⚠️ No access token available');
+        throw new Error('No access token available');
+      }
+      
+      // Update axios headers with current token
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
+      const response = await axios.put('/users/balance', balanceData);
+      this.userData = response.data.data;
+      
+      console.log('✅ User balance updated successfully:', this.userData);
+      return this.userData;
+    } catch (error) {
+      // Check if it's a rate limiting error
+      if (error.response && error.response.status === 429) {
+        console.log('Rate limited, retrying later');
+        throw new Error('Rate limited - please try again later');
+      }
+      
+      // Check if it's an authentication error
+      if (error.response && error.response.status === 401) {
+        console.log('Authentication error - token may be invalid');
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        throw new Error('Authentication failed - please refresh the page');
+      }
+      
+      console.error('Error updating user balance:', error);
       throw error;
     }
   }
@@ -312,7 +367,7 @@ class MongoDBService {
       }
       
       // Ensure we have a token
-      const token = localStorage.getItem('accessToken');
+      const token = localStorage.getItem('accessToken') || 'dev-token-123';
       if (!token) {
         console.log('⚠️ No access token available');
         throw new Error('No access token available');

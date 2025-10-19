@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { User, Wallet, TrendingUp, Trophy, Settings, Shield, CreditCard, History, Gift, Award, Star, Calendar, BarChart3, Target, Zap, Users, Crown, Flame, DollarSign, Copy, CheckCircle, AlertCircle, Clock, Network, Sword, ChevronDown, X } from 'lucide-react'
 import dataService from '../services/dataService'
 import walletService from '../services/walletService'
+import telegramWebAppService from '../services/telegramWebAppService'
 
 const Profile = () => {
   const [userProfile, setUserProfile] = useState({})
@@ -38,12 +39,26 @@ const Profile = () => {
 
   const loadData = async () => {
     try {
-      // Initialize dataService if not already initialized
-      if (!dataService.isInitialized) {
-        await dataService.initializeData()
+      // Check if we have Telegram user data first
+      const telegramUserData = telegramWebAppService.getUserData()
+      console.log('📱 Telegram User Data in Profile:', telegramUserData)
+      
+      if (telegramUserData) {
+        // Use Telegram user data as primary source
+        setUserProfile(telegramUserData)
+        console.log('✅ Using Telegram user data for profile')
+      } else {
+        // Fallback to dataService
+        if (!dataService.isInitialized) {
+          await dataService.initializeData()
+        }
+        
+        const serviceUserData = dataService.userData || {}
+        setUserProfile(serviceUserData)
+        console.log('🔄 Using dataService user data for profile:', serviceUserData)
       }
       
-      setUserProfile(dataService.userData || {})
+      // Load other data from services
       setTransactionHistory(dataService.transactions || [])
       setAchievements(dataService.achievements || [])
       

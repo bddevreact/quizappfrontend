@@ -253,15 +253,18 @@ class ReferralService {
     }
   }
 
-  // Get user's referral statistics
+  // Get user's referral statistics - From MongoDB
   async getUserReferralStats(userId) {
     try {
-      // TODO: Get from MongoDB when backend is ready
-      const mockStats = {
-        totalReferrals: Math.floor(Math.random() * 20),
-        successfulReferrals: Math.floor(Math.random() * 15),
-        pendingReferrals: Math.floor(Math.random() * 5),
-        totalEarnings: Math.floor(Math.random() * 200),
+      // Get real referral data from database
+      const referrals = await dataService.getReferrals()
+      const userReferrals = referrals.filter(ref => ref.referrerId === userId)
+      
+      const stats = {
+        totalReferrals: userReferrals.length,
+        successfulReferrals: userReferrals.filter(ref => ref.status === 'completed').length,
+        pendingReferrals: userReferrals.filter(ref => ref.status === 'pending').length,
+        totalEarnings: userReferrals.reduce((sum, ref) => sum + (ref.rewardAmount || 0), 0),
         referralLink: this.generateReferralLink(userId),
         maxReferrals: this.maxReferralsPerUser,
         referralReward: this.referralReward,
@@ -270,7 +273,7 @@ class ReferralService {
 
       return {
         success: true,
-        stats: mockStats
+        stats: stats
       }
     } catch (error) {
       console.error('Error getting referral stats:', error)
@@ -281,21 +284,43 @@ class ReferralService {
     }
   }
 
-  // Get referral leaderboard
+  // Get referral leaderboard - From MongoDB
   async getReferralLeaderboard(limit = 10) {
     try {
-      // TODO: Get from MongoDB when backend is ready
-      const mockLeaderboard = Array.from({ length: limit }, (_, index) => ({
-        rank: index + 1,
-        userId: `user_${index + 1}`,
-        username: `User${index + 1}`,
-        totalReferrals: Math.floor(Math.random() * 50) + 1,
-        totalEarnings: Math.floor(Math.random() * 500) + 10
-      }))
+      // Get real referral data from database
+      const referrals = await dataService.getReferrals()
+      
+      // Group referrals by referrer and calculate stats
+      const referrerStats = {}
+      referrals.forEach(ref => {
+        const referrerId = ref.referrerId
+        if (!referrerStats[referrerId]) {
+          referrerStats[referrerId] = {
+            userId: referrerId,
+            username: ref.referrerUsername || 'Unknown',
+            totalReferrals: 0,
+            totalEarnings: 0
+          }
+        }
+        referrerStats[referrerId].totalReferrals++
+        referrerStats[referrerId].totalEarnings += ref.rewardAmount || 0
+      })
+      
+      // Convert to array and sort by total referrals
+      const leaderboard = Object.values(referrerStats)
+        .sort((a, b) => b.totalReferrals - a.totalReferrals)
+        .slice(0, limit)
+        .map((user, index) => ({
+          rank: index + 1,
+          userId: user.userId,
+          username: user.username,
+          totalReferrals: user.totalReferrals,
+          totalEarnings: user.totalEarnings
+        }))
 
       return {
         success: true,
-        leaderboard: mockLeaderboard
+        leaderboard: leaderboard
       }
     } catch (error) {
       console.error('Error getting referral leaderboard:', error)

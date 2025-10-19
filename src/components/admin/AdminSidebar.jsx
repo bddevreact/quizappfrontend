@@ -24,6 +24,7 @@ const AdminSidebar = ({ isOpen, onClose }) => {
 
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+    // { name: 'Enhanced Dashboard', href: '/admin/dashboard-enhanced', icon: LayoutDashboard, badge: 'New' },
     { name: 'User Management', href: '/admin/users', icon: Users },
     { name: 'Quiz Management', href: '/admin/quiz', icon: Target },
     { name: 'Tournaments', href: '/admin/tournaments', icon: Trophy },

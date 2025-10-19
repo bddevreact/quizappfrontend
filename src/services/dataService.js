@@ -414,10 +414,206 @@ class DataService {
   // Add transaction (database version)
   async addTransaction(transaction) {
     try {
-      const result = await mongoDBService.createTransaction(transaction);
-      return result;
+      console.log('💰 Adding transaction:', transaction);
+      
+      // Try to create transaction in database first
+      try {
+        const result = await mongoDBService.createTransaction(transaction);
+        console.log('✅ Transaction created successfully in database:', result);
+        return result;
+      } catch (dbError) {
+        console.log('⚠️ Database transaction creation failed, storing locally:', dbError.message);
+        
+        // Fallback: Store transaction in localStorage for later sync
+        const pendingTransactions = JSON.parse(localStorage.getItem('quizApp_pendingTransactions') || '[]');
+        const transactionWithId = {
+          ...transaction,
+          id: `local_${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          synced: false
+        };
+        pendingTransactions.push(transactionWithId);
+        localStorage.setItem('quizApp_pendingTransactions', JSON.stringify(pendingTransactions));
+        
+        console.log('✅ Transaction stored locally, will sync when backend is available');
+        return transactionWithId;
+      }
     } catch (error) {
       console.error('Error adding transaction:', error);
+      return false;
+    }
+  }
+
+  // Complete quiz and update user data
+  async completeQuiz(score, totalQuestions, difficulty) {
+    try {
+      console.log('🎯 Completing quiz:', { score, totalQuestions, difficulty });
+      
+      const userData = this.getUserData();
+      if (!userData) {
+        throw new Error('User data not available');
+      }
+
+      // Calculate rewards based on score and difficulty
+      const baseReward = this.getDifficultyReward(difficulty);
+      const scoreMultiplier = score / 100;
+      const reward = Math.round(baseReward * scoreMultiplier * 100) / 100;
+
+      // Update user statistics
+      const updatedUserData = {
+        ...userData,
+        questionsAnswered: (userData.questionsAnswered || 0) + totalQuestions,
+        totalXP: (userData.totalXP || 0) + Math.round(score * 0.1),
+        averageScore: this.calculateAverageScore(userData, score),
+        totalEarned: (userData.totalEarned || 0) + reward,
+        playableBalance: (userData.playableBalance || 0) + reward,
+        availableBalance: (userData.availableBalance || 0) + reward,
+        lastQuizDate: new Date().toISOString(),
+        lastQuizScore: score,
+        lastQuizDifficulty: difficulty
+      };
+
+      // Try to update user data in database first
+      try {
+        const result = await this.updateUserData(updatedUserData);
+        console.log('✅ Quiz completed successfully in database:', result);
+        
+        // Also update local data
+        this.userData = updatedUserData;
+        
+        return result;
+      } catch (dbError) {
+        console.log('⚠️ Database update failed, updating local data only:', dbError.message);
+        
+        // Fallback: Update local data and store in localStorage
+        this.userData = updatedUserData;
+        localStorage.setItem('quizApp_userData', JSON.stringify(updatedUserData));
+        
+        // Store quiz completion in localStorage for later sync
+        const quizCompletion = {
+          score,
+          totalQuestions,
+          difficulty,
+          reward,
+          timestamp: new Date().toISOString(),
+          synced: false
+        };
+        
+        const pendingCompletions = JSON.parse(localStorage.getItem('quizApp_pendingCompletions') || '[]');
+        pendingCompletions.push(quizCompletion);
+        localStorage.setItem('quizApp_pendingCompletions', JSON.stringify(pendingCompletions));
+        
+        console.log('✅ Quiz completed locally, will sync when backend is available');
+        return updatedUserData;
+      }
+    } catch (error) {
+      console.error('Error completing quiz:', error);
+      throw error;
+    }
+  }
+
+  // Get difficulty reward multiplier
+  getDifficultyReward(difficulty) {
+    switch (difficulty) {
+      case 'easy': return 0.5;
+      case 'medium': return 1.0;
+      case 'hard': return 2.0;
+      default: return 0.5;
+    }
+  }
+
+  // Calculate average score
+  calculateAverageScore(userData, newScore) {
+    const currentAverage = userData.averageScore || 0;
+    const totalQuizzes = userData.questionsAnswered || 0;
+    
+    if (totalQuizzes === 0) {
+      return newScore;
+    }
+    
+    return Math.round(((currentAverage * (totalQuizzes - 1)) + newScore) / totalQuizzes);
+  }
+
+  // Sync pending data with backend
+  async syncPendingData() {
+    try {
+      console.log('🔄 Syncing pending data with backend...');
+      
+      // Check if backend is available
+      await mongoDBService.checkBackendAvailability();
+      if (!mongoDBService.backendAvailable) {
+        console.log('⚠️ Backend not available for sync');
+        return false;
+      }
+      
+      // Sync pending quiz completions
+      const pendingCompletions = JSON.parse(localStorage.getItem('quizApp_pendingCompletions') || '[]');
+      if (pendingCompletions.length > 0) {
+        console.log(`📊 Syncing ${pendingCompletions.length} pending quiz completions...`);
+        
+        for (const completion of pendingCompletions) {
+          if (!completion.synced) {
+            try {
+              // Update user data with completion
+              const userData = this.getUserData();
+              const updatedUserData = {
+                ...userData,
+                questionsAnswered: (userData.questionsAnswered || 0) + completion.totalQuestions,
+                totalXP: (userData.totalXP || 0) + Math.round(completion.score * 0.1),
+                averageScore: this.calculateAverageScore(userData, completion.score),
+                totalEarned: (userData.totalEarned || 0) + completion.reward,
+                playableBalance: (userData.playableBalance || 0) + completion.reward,
+                availableBalance: (userData.availableBalance || 0) + completion.reward,
+                lastQuizDate: completion.timestamp,
+                lastQuizScore: completion.score,
+                lastQuizDifficulty: completion.difficulty
+              };
+              
+              await this.updateUserData(updatedUserData);
+              completion.synced = true;
+              console.log('✅ Synced quiz completion:', completion.timestamp);
+            } catch (error) {
+              console.log('⚠️ Failed to sync quiz completion:', error.message);
+            }
+          }
+        }
+        
+        // Update localStorage with synced completions
+        const syncedCompletions = pendingCompletions.filter(c => c.synced);
+        const unsyncedCompletions = pendingCompletions.filter(c => !c.synced);
+        localStorage.setItem('quizApp_pendingCompletions', JSON.stringify(unsyncedCompletions));
+        
+        console.log(`✅ Synced ${syncedCompletions.length} quiz completions`);
+      }
+      
+      // Sync pending transactions
+      const pendingTransactions = JSON.parse(localStorage.getItem('quizApp_pendingTransactions') || '[]');
+      if (pendingTransactions.length > 0) {
+        console.log(`💰 Syncing ${pendingTransactions.length} pending transactions...`);
+        
+        for (const transaction of pendingTransactions) {
+          if (!transaction.synced) {
+            try {
+              await mongoDBService.createTransaction(transaction);
+              transaction.synced = true;
+              console.log('✅ Synced transaction:', transaction.id);
+            } catch (error) {
+              console.log('⚠️ Failed to sync transaction:', error.message);
+            }
+          }
+        }
+        
+        // Update localStorage with synced transactions
+        const syncedTransactions = pendingTransactions.filter(t => t.synced);
+        const unsyncedTransactions = pendingTransactions.filter(t => !t.synced);
+        localStorage.setItem('quizApp_pendingTransactions', JSON.stringify(unsyncedTransactions));
+        
+        console.log(`✅ Synced ${syncedTransactions.length} transactions`);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error syncing pending data:', error);
       return false;
     }
   }

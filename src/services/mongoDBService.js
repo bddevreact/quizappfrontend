@@ -122,24 +122,45 @@ class MongoDBService {
 
   async updateUserData(userData) {
     try {
+      console.log('🔄 Updating user data:', userData);
+      
       // Check backend availability first
       await this.checkBackendAvailability();
       
       // If backend is not available, return error
       if (!this.backendAvailable) {
-        console.log('Backend not available - cannot update user data');
+        console.log('⚠️ Backend not available - cannot update user data');
         throw new Error('Backend not available');
       }
+      
+      // Ensure we have a token
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        console.log('⚠️ No access token available');
+        throw new Error('No access token available');
+      }
+      
+      // Update axios headers with current token
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       
       const response = await axios.put('/users/profile', userData);
       this.userData = response.data.data;
       
+      console.log('✅ User data updated successfully:', this.userData);
       return this.userData;
     } catch (error) {
       // Check if it's a rate limiting error
       if (error.response && error.response.status === 429) {
         console.log('Rate limited, retrying later');
         throw new Error('Rate limited - please try again later');
+      }
+      
+      // Check if it's an authentication error
+      if (error.response && error.response.status === 401) {
+        console.log('Authentication error - token may be invalid');
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        throw new Error('Authentication failed - please refresh the page');
       }
       
       console.error('Error updating user data:', error);
@@ -226,9 +247,46 @@ class MongoDBService {
 
   async createTransaction(transactionData) {
     try {
+      console.log('💰 Creating transaction:', transactionData);
+      
+      // Check backend availability first
+      await this.checkBackendAvailability();
+      
+      // If backend is not available, return error
+      if (!this.backendAvailable) {
+        console.log('⚠️ Backend not available - cannot create transaction');
+        throw new Error('Backend not available');
+      }
+      
+      // Ensure we have a token
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        console.log('⚠️ No access token available');
+        throw new Error('No access token available');
+      }
+      
+      // Update axios headers with current token
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
       const response = await axios.post('/transactions', transactionData);
+      
+      console.log('✅ Transaction created successfully:', response.data.data);
       return response.data.data;
     } catch (error) {
+      // Check if it's a rate limiting error
+      if (error.response && error.response.status === 429) {
+        console.log('Rate limited, retrying later');
+        throw new Error('Rate limited - please try again later');
+      }
+      
+      // Check if it's an authentication error
+      if (error.response && error.response.status === 401) {
+        console.log('Authentication error - token may be invalid');
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        throw new Error('Authentication failed - please refresh the page');
+      }
+      
       console.error('Error creating transaction:', error);
       throw error;
     }

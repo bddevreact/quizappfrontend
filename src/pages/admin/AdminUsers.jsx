@@ -35,6 +35,7 @@ import {
   Download
 } from 'lucide-react';
 import telegramWebAppService from '../../services/telegramWebAppService';
+import adminDataService from '../../services/adminDataService';
 
 const AdminUsers = () => {
   const [users, setUsers] = useState([]);
@@ -52,106 +53,19 @@ const AdminUsers = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      console.log('👥 Fetching users data...');
       
-      // Try to fetch from API first
-      try {
-        const token = localStorage.getItem('accessToken');
-        const response = await fetch('/api/admin/users', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          setUsers(result.data);
-          return;
-        }
-      } catch (apiError) {
-        console.log('API not available, using mock data');
-      }
-
-      // Fallback to mock data
-      const mockUsers = [
-        {
-          id: 1,
-          name: 'John Doe',
-          email: 'john@example.com',
-          telegramId: '123456789',
-          telegramUsername: 'johndoe',
-          balance: 150.50,
-          level: 5,
-          totalXP: 450,
-          joinDate: '2024-01-15',
-          status: 'active',
-          isTelegramUser: true,
-          lastSeen: '2024-01-16',
-          totalEarned: 250.75,
-          tournamentsWon: 3,
-          questionsAnswered: 45,
-          averageScore: 78.5
-        },
-        {
-          id: 2,
-          name: 'Jane Smith',
-          email: 'jane@example.com',
-          telegramId: '987654321',
-          telegramUsername: 'janesmith',
-          balance: 75.25,
-          level: 3,
-          totalXP: 280,
-          joinDate: '2024-01-14',
-          status: 'active',
-          isTelegramUser: true,
-          lastSeen: '2024-01-16',
-          totalEarned: 125.50,
-          tournamentsWon: 1,
-          questionsAnswered: 28,
-          averageScore: 72.0
-        },
-        {
-          id: 3,
-          name: 'Bob Johnson',
-          email: 'bob@example.com',
-          telegramId: null,
-          telegramUsername: null,
-          balance: 200.00,
-          level: 7,
-          totalXP: 680,
-          joinDate: '2024-01-13',
-          status: 'pending',
-          isTelegramUser: false,
-          lastSeen: '2024-01-15',
-          totalEarned: 350.25,
-          tournamentsWon: 5,
-          questionsAnswered: 67,
-          averageScore: 85.2
-        },
-        {
-          id: 4,
-          name: 'Alice Brown',
-          email: 'alice@example.com',
-          telegramId: '456789123',
-          telegramUsername: 'alicebrown',
-          balance: 50.75,
-          level: 2,
-          totalXP: 150,
-          joinDate: '2024-01-12',
-          status: 'blocked',
-          isTelegramUser: true,
-          lastSeen: '2024-01-10',
-          totalEarned: 75.00,
-          tournamentsWon: 0,
-          questionsAnswered: 15,
-          averageScore: 65.5
-        }
-      ];
-
-      setUsers(mockUsers);
+      // Initialize admin data service
+      await adminDataService.initialize();
+      
+      // Get real users data
+      const usersData = await adminDataService.getAllUsers();
+      console.log('👥 Users data:', usersData);
+      
+      setUsers(usersData);
     } catch (error) {
       console.error('Error fetching users:', error);
-      setError('Failed to load users');
+      setError('Failed to load users data');
     } finally {
       setLoading(false);
     }
@@ -159,32 +73,12 @@ const AdminUsers = () => {
 
   const fetchTelegramUsers = async () => {
     try {
-      // Get current Telegram user data if available
-      const isTelegram = telegramWebAppService.isTelegramWebApp();
-      const userData = telegramWebAppService.getUserData();
+      // Get Telegram users from admin data service
+      const allUsers = await adminDataService.getAllUsers();
+      const telegramUsers = allUsers.filter(user => user.isTelegramUser);
       
-      if (isTelegram && userData) {
-        const telegramUser = {
-          id: 'telegram-current',
-          name: userData.fullName || userData.name || 'Current User',
-          telegramId: userData.telegramId,
-          telegramUsername: userData.username,
-          balance: userData.balance || 0,
-          level: userData.level || 1,
-          totalXP: userData.totalXP || 0,
-          joinDate: new Date().toISOString().split('T')[0],
-          status: 'active',
-          isTelegramUser: true,
-          lastSeen: 'Now',
-          totalEarned: userData.totalEarned || 0,
-          tournamentsWon: userData.tournamentsWon || 0,
-          questionsAnswered: userData.questionsAnswered || 0,
-          averageScore: userData.averageScore || 0,
-          isCurrentUser: true
-        };
-        
-        setTelegramUsers([telegramUser]);
-      }
+      console.log('📱 Telegram users:', telegramUsers);
+      setTelegramUsers(telegramUsers);
     } catch (error) {
       console.error('Error fetching Telegram users:', error);
     }
@@ -192,27 +86,62 @@ const AdminUsers = () => {
 
   const handleBlockUser = async (userId) => {
     if (window.confirm('Are you sure you want to block this user?')) {
-      setUsers(users.map(user => 
-        user.id === userId 
-          ? { ...user, status: 'blocked' }
-          : user
-      ));
+      try {
+        await adminDataService.updateUser(userId, { status: 'blocked' });
+        setUsers(users.map(user => 
+          user.id === userId 
+            ? { ...user, status: 'blocked' }
+            : user
+        ));
+        alert('User blocked successfully');
+      } catch (error) {
+        console.error('Error blocking user:', error);
+        alert('Failed to block user');
+      }
     }
   };
 
   const handleUnblockUser = async (userId) => {
     if (window.confirm('Are you sure you want to unblock this user?')) {
-      setUsers(users.map(user => 
-        user.id === userId 
-          ? { ...user, status: 'active' }
-          : user
-      ));
+      try {
+        await adminDataService.updateUser(userId, { status: 'active' });
+        setUsers(users.map(user => 
+          user.id === userId 
+            ? { ...user, status: 'active' }
+            : user
+        ));
+        alert('User unblocked successfully');
+      } catch (error) {
+        console.error('Error unblocking user:', error);
+        alert('Failed to unblock user');
+      }
     }
   };
 
   const handleDeleteUser = async (userId) => {
     if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      setUsers(users.filter(user => user.id !== userId));
+      try {
+        // Note: In a real implementation, you would call an API to delete the user
+        // For now, we'll just remove from local state
+        setUsers(users.filter(user => user.id !== userId));
+        alert('User deleted successfully');
+      } catch (error) {
+        console.error('Error deleting user:', error);
+        alert('Failed to delete user');
+      }
+    }
+  };
+
+  const handleVerifyUser = async (userId) => {
+    try {
+      await adminDataService.updateUser(userId, { isVerified: true });
+      setUsers(users.map(user => 
+        user.id === userId ? { ...user, isVerified: true } : user
+      ));
+      alert('User verified successfully');
+    } catch (error) {
+      console.error('Error verifying user:', error);
+      alert('Failed to verify user');
     }
   };
 

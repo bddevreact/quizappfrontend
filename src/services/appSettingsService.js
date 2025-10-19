@@ -56,6 +56,19 @@ class AppSettingsService {
         maintenanceMode: false
       },
       
+      // Daily Bonus Settings
+      dailyBonus: {
+        amount: 1.0,
+        maxStreak: 30,
+        streakMultipliers: {
+          1: 1.0,
+          3: 1.5,
+          7: 2.0,
+          14: 2.5,
+          30: 3.0
+        }
+      },
+      
       // App Configuration
       appConfig: {
         appName: 'Quizly',
@@ -141,6 +154,37 @@ class AppSettingsService {
     } catch (error) {
       console.error(`Error getting ${category} settings:`, error)
       return {}
+    }
+  }
+
+  // Get daily bonus settings
+  async getDailyBonusSettings() {
+    try {
+      const settings = await this.getAppSettings()
+      return settings.dailyBonus || {
+        amount: 1.0,
+        maxStreak: 30,
+        streakMultipliers: {
+          1: 1.0,
+          3: 1.5,
+          7: 2.0,
+          14: 2.5,
+          30: 3.0
+        }
+      }
+    } catch (error) {
+      console.error('Error getting daily bonus settings:', error)
+      return {
+        amount: 1.0,
+        maxStreak: 30,
+        streakMultipliers: {
+          1: 1.0,
+          3: 1.5,
+          7: 2.0,
+          14: 2.5,
+          30: 3.0
+        }
+      }
     }
   }
 

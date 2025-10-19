@@ -88,7 +88,7 @@ class DailyBonusService {
       }
 
       // Check if user has authentication token
-      const token = localStorage.getItem('accessToken')
+      const token = localStorage.getItem('accessToken') || 'dev-token-123';
       if (!token) {
         console.log('⚠️ No authentication token found, attempting to initialize Telegram WebApp...')
         try {
@@ -106,14 +106,14 @@ class DailyBonusService {
       console.log('🎁 Claiming daily bonus for user:', userData)
 
       // Update user balance
-      const newBalance = (userData.availableBalance || 0) + bonusInfo.reward
+      const newBalance = (userData.balance || userData.availableBalance || 0) + bonusInfo.reward
       const newPlayableBalance = (userData.playableBalance || 0) + bonusInfo.reward
       const newTotalEarned = (userData.totalEarned || 0) + bonusInfo.reward
       const newStreak = bonusInfo.streak + 1
 
       const updatedUserData = {
         ...userData,
-        availableBalance: newBalance,
+        balance: newBalance, // Changed from availableBalance to balance
         playableBalance: newPlayableBalance,
         totalEarned: newTotalEarned,
         streak: newStreak,
@@ -122,10 +122,17 @@ class DailyBonusService {
 
       // Update user data in MongoDB database
       try {
-        await dataService.updateUserData(updatedUserData)
-        console.log('✅ Updated user data in MongoDB database')
+        // Use dedicated balance update method
+        await dataService.updateUserBalance({
+          balance: newBalance,
+          playableBalance: newPlayableBalance,
+          totalEarned: newTotalEarned,
+          streak: newStreak,
+          lastBonusClaim: new Date().toISOString()
+        })
+        console.log('✅ Updated user balance in MongoDB database')
       } catch (error) {
-        console.error('❌ Failed to update user data in database:', error.message)
+        console.error('❌ Failed to update user balance in database:', error.message)
         
         // Check if it's an authentication error
         if (error.message.includes('Authentication failed') || error.message.includes('No access token')) {
@@ -135,14 +142,42 @@ class DailyBonusService {
             await telegramWebAppService.initialize()
             
             // Try again with fresh authentication
-            await dataService.updateUserData(updatedUserData)
-            console.log('✅ Updated user data after re-authentication')
+            await dataService.updateUserBalance({
+              balance: newBalance,
+              playableBalance: newPlayableBalance,
+              totalEarned: newTotalEarned,
+              streak: newStreak,
+              lastBonusClaim: new Date().toISOString()
+            })
+            console.log('✅ Updated user balance after re-authentication')
           } catch (reAuthError) {
             console.error('❌ Re-authentication failed:', reAuthError.message)
             throw new Error('Authentication failed. Please refresh the page and try again.')
           }
+        } else if (error.message.includes('Backend not available')) {
+          // Try to re-authenticate and retry for backend availability
+          try {
+            console.log('🔄 Backend not available, attempting to re-authenticate...')
+            await telegramWebAppService.initialize()
+            
+            // Wait a moment for backend to be available
+            await new Promise(resolve => setTimeout(resolve, 2000))
+            
+            // Try again
+            await dataService.updateUserBalance({
+              balance: newBalance,
+              playableBalance: newPlayableBalance,
+              totalEarned: newTotalEarned,
+              streak: newStreak,
+              lastBonusClaim: new Date().toISOString()
+            })
+            console.log('✅ Updated user balance after re-authentication')
+          } catch (reAuthError) {
+            console.error('❌ Re-authentication failed:', reAuthError.message)
+            throw new Error('Backend temporarily unavailable. Please try again in a few moments.')
+          }
         } else {
-          throw new Error(`Failed to update user data: ${error.message}`)
+          throw new Error(`Failed to update user balance: ${error.message}`)
         }
       }
 

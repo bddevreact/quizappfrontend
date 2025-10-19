@@ -34,7 +34,6 @@ import AdminReferrals from './pages/admin/AdminReferrals';
 import AdminDailyBonus from './pages/admin/AdminDailyBonus';
 import AdminWalletSettings from './pages/admin/AdminWalletSettings';
 import AdminAppSettings from './pages/admin/AdminAppSettings';
-import TelegramDebugInfo from './components/TelegramDebugInfo';
 
 function AppContent() {
   const location = useLocation();
@@ -278,9 +277,6 @@ function AppContent() {
         </Routes>
       </main>
       {!isAdminRoute && <BottomNavbar user={user} />}
-      
-      {/* Debug Component */}
-      <TelegramDebugInfo />
     </div>
   );
 }

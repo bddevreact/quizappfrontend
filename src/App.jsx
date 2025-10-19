@@ -17,7 +17,7 @@ import appSettingsService from './services/appSettingsService';
 import AdminLayout from './components/AdminLayout';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminDashboardEnhanced from './pages/admin/AdminDashboardEnhanced';
+// import AdminDashboardEnhanced from './pages/admin/AdminDashboardEnhanced';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminQuiz from './pages/admin/AdminQuiz';
 import AdminTournaments from './pages/admin/AdminTournaments';
@@ -180,11 +180,11 @@ function AppContent() {
               <AdminDashboard />
             </AdminLayout>
           } />
-          <Route path="/admin/dashboard-enhanced" element={
+          {/* <Route path="/admin/dashboard-enhanced" element={
             <AdminLayout>
               <AdminDashboardEnhanced />
             </AdminLayout>
-          } />
+          } /> */}
           <Route path="/admin/users" element={
             <AdminLayout>
               <AdminUsers />

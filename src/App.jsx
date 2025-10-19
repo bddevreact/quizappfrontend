@@ -17,6 +17,7 @@ import appSettingsService from './services/appSettingsService';
 import AdminLayout from './components/AdminLayout';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminDashboardEnhanced from './pages/admin/AdminDashboardEnhanced';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminQuiz from './pages/admin/AdminQuiz';
 import AdminTournaments from './pages/admin/AdminTournaments';
@@ -111,6 +112,18 @@ function AppContent() {
             // Don't block the app
           }
         }
+        
+        // Set up periodic data sync
+        const syncInterval = setInterval(async () => {
+          try {
+            await dataService.syncPendingData();
+          } catch (error) {
+            console.log('Sync error (non-blocking):', error.message);
+          }
+        }, 30000); // Sync every 30 seconds
+        
+        // Cleanup interval on unmount
+        return () => clearInterval(syncInterval);
       } catch (error) {
         console.error('Error initializing app:', error);
       } finally {
@@ -175,6 +188,11 @@ function AppContent() {
           <Route path="/admin" element={
             <AdminLayout>
               <AdminDashboard />
+            </AdminLayout>
+          } />
+          <Route path="/admin/dashboard-enhanced" element={
+            <AdminLayout>
+              <AdminDashboardEnhanced />
             </AdminLayout>
           } />
           <Route path="/admin/users" element={

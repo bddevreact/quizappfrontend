@@ -87,6 +87,22 @@ class DailyBonusService {
         }
       }
 
+      // Check if user has authentication token
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        console.log('⚠️ No authentication token found, attempting to initialize Telegram WebApp...')
+        try {
+          await telegramWebAppService.initialize()
+          console.log('✅ Telegram WebApp initialized successfully')
+        } catch (initError) {
+          console.error('❌ Failed to initialize Telegram WebApp:', initError.message)
+          return {
+            success: false,
+            message: 'Authentication required. Please refresh the page and try again.'
+          }
+        }
+      }
+
       console.log('🎁 Claiming daily bonus for user:', userData)
 
       // Update user balance
@@ -110,7 +126,24 @@ class DailyBonusService {
         console.log('✅ Updated user data in MongoDB database')
       } catch (error) {
         console.error('❌ Failed to update user data in database:', error.message)
-        throw new Error(`Failed to update user data: ${error.message}`)
+        
+        // Check if it's an authentication error
+        if (error.message.includes('Authentication failed') || error.message.includes('No access token')) {
+          // Try to re-authenticate via Telegram WebApp
+          try {
+            console.log('🔄 Attempting to re-authenticate via Telegram WebApp...')
+            await telegramWebAppService.initialize()
+            
+            // Try again with fresh authentication
+            await dataService.updateUserData(updatedUserData)
+            console.log('✅ Updated user data after re-authentication')
+          } catch (reAuthError) {
+            console.error('❌ Re-authentication failed:', reAuthError.message)
+            throw new Error('Authentication failed. Please refresh the page and try again.')
+          }
+        } else {
+          throw new Error(`Failed to update user data: ${error.message}`)
+        }
       }
 
       console.log('🎁 Daily bonus claimed - Updated balance:', newBalance)
@@ -133,7 +166,14 @@ class DailyBonusService {
         console.log('✅ Transaction record added to MongoDB')
       } catch (error) {
         console.error('❌ Failed to add transaction record:', error.message)
-        throw new Error(`Failed to add transaction: ${error.message}`)
+        
+        // Check if it's an authentication error
+        if (error.message.includes('Authentication failed') || error.message.includes('No access token')) {
+          console.log('⚠️ Transaction creation failed due to authentication - continuing without transaction record')
+        } else {
+          console.log('⚠️ Transaction creation failed - continuing without transaction record')
+        }
+        // Don't throw error - transaction logging is not critical for daily bonus
       }
 
       // Add activity to MongoDB database
@@ -149,7 +189,14 @@ class DailyBonusService {
         console.log('✅ Activity record added to MongoDB')
       } catch (error) {
         console.error('❌ Failed to add activity record:', error.message)
-        throw new Error(`Failed to add activity: ${error.message}`)
+        
+        // Check if it's an authentication error
+        if (error.message.includes('Authentication failed') || error.message.includes('No access token')) {
+          console.log('⚠️ Activity creation failed due to authentication - continuing without activity record')
+        } else {
+          console.log('⚠️ Activity creation failed - continuing without activity record')
+        }
+        // Don't throw error - activity logging is not critical for daily bonus
       }
 
       // Mark as claimed (stored in database via user data update)

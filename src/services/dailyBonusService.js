@@ -1,10 +1,10 @@
 import dataService from './dataService'
 import appSettingsService from './appSettingsService'
+import telegramWebAppService from './telegramWebAppService'
 
 class DailyBonusService {
   constructor() {
-    this.storageKey = 'quizApp_dailyBonus'
-    this.lastClaimKey = 'quizApp_lastBonusDate'
+    // No localStorage needed - using MongoDB database only
   }
 
   // Check if daily bonus is available
@@ -18,14 +18,21 @@ class DailyBonusService {
         return null
       }
 
+      // Get user data to check last claim
+      let userData = telegramWebAppService.getUserData()
+      if (!userData) {
+        userData = dataService.getUserData()
+      }
+
       const today = new Date().toDateString()
-      const lastClaimDate = localStorage.getItem(this.lastClaimKey)
+      const lastClaimDate = userData?.lastBonusClaim ? new Date(userData.lastBonusClaim).toDateString() : null
       
       // Check if user already claimed today
       if (lastClaimDate === today) {
+        const dailyBonusSettings = await appSettingsService.getDailyBonusSettings()
         return {
           available: false,
-          reward: settings.dailyBonus?.amount || 1.0,
+          reward: dailyBonusSettings.amount || 1.0,
           cooldown: this.getCooldownTime(),
           streak: this.getCurrentStreak(),
           nextAvailable: this.getNextAvailableTime()
@@ -34,7 +41,8 @@ class DailyBonusService {
 
       // Calculate streak bonus
       const streak = this.getCurrentStreak()
-      const baseReward = settings.dailyBonus?.amount || 1.0
+      const dailyBonusSettings = await appSettingsService.getDailyBonusSettings()
+      const baseReward = dailyBonusSettings.amount || 1.0
       const streakMultiplier = this.getStreakMultiplier(streak)
       const totalReward = baseReward * streakMultiplier
 
@@ -65,13 +73,20 @@ class DailyBonusService {
         }
       }
 
-      const userData = dataService.getUserData()
+      // Get user data - prioritize Telegram user data
+      let userData = telegramWebAppService.getUserData()
+      if (!userData) {
+        userData = dataService.getUserData()
+      }
+      
       if (!userData) {
         return {
           success: false,
-          message: 'User data not found'
+          message: 'User data not found. Please refresh and try again.'
         }
       }
+
+      console.log('🎁 Claiming daily bonus for user:', userData)
 
       // Update user balance
       const newBalance = (userData.availableBalance || 0) + bonusInfo.reward
@@ -79,41 +94,62 @@ class DailyBonusService {
       const newTotalEarned = (userData.totalEarned || 0) + bonusInfo.reward
       const newStreak = bonusInfo.streak + 1
 
-      await dataService.updateUserData({
+      const updatedUserData = {
         ...userData,
         availableBalance: newBalance,
         playableBalance: newPlayableBalance,
         totalEarned: newTotalEarned,
         streak: newStreak,
         lastBonusClaim: new Date().toISOString()
-      })
+      }
 
-      console.log('Daily bonus claimed - Updated balance:', newBalance)
+      // Update user data in MongoDB database
+      try {
+        await dataService.updateUserData(updatedUserData)
+        console.log('✅ Updated user data in MongoDB database')
+      } catch (error) {
+        console.error('❌ Failed to update user data in database:', error.message)
+        throw new Error(`Failed to update user data: ${error.message}`)
+      }
 
-      // Add transaction record
-      await dataService.addTransaction({
-        type: 'daily_bonus',
-        amount: bonusInfo.reward,
-        status: 'completed',
-        txHash: `DailyBonus_${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        details: {
-          streak: newStreak,
-          baseReward: bonusInfo.baseReward,
-          streakMultiplier: bonusInfo.streakMultiplier,
-          totalReward: bonusInfo.reward
-        }
-      })
+      console.log('🎁 Daily bonus claimed - Updated balance:', newBalance)
 
-      // Add activity
-      await dataService.addActivity({
-        type: 'daily_bonus_claimed',
-        title: 'Daily Bonus Claimed!',
-        description: `Earned ${bonusInfo.reward.toFixed(2)} USDT (${newStreak} day streak)`,
-        time: 'Just now',
-        icon: '🎁',
-        reward: bonusInfo.reward
-      })
+      // Add transaction record to MongoDB database
+      try {
+        await dataService.addTransaction({
+          type: 'daily_bonus',
+          amount: bonusInfo.reward,
+          status: 'completed',
+          txHash: `DailyBonus_${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          details: {
+            streak: newStreak,
+            baseReward: bonusInfo.baseReward,
+            streakMultiplier: bonusInfo.streakMultiplier,
+            totalReward: bonusInfo.reward
+          }
+        })
+        console.log('✅ Transaction record added to MongoDB')
+      } catch (error) {
+        console.error('❌ Failed to add transaction record:', error.message)
+        throw new Error(`Failed to add transaction: ${error.message}`)
+      }
+
+      // Add activity to MongoDB database
+      try {
+        await dataService.addActivity({
+          type: 'daily_bonus_claimed',
+          title: 'Daily Bonus Claimed!',
+          description: `Earned ${bonusInfo.reward.toFixed(2)} USDT (${newStreak} day streak)`,
+          time: 'Just now',
+          icon: '🎁',
+          reward: bonusInfo.reward
+        })
+        console.log('✅ Activity record added to MongoDB')
+      } catch (error) {
+        console.error('❌ Failed to add activity record:', error.message)
+        throw new Error(`Failed to add activity: ${error.message}`)
+      }
 
       // Mark as claimed (stored in database via user data update)
       console.log('Daily bonus claimed successfully')
@@ -129,7 +165,7 @@ class DailyBonusService {
       console.error('Error claiming daily bonus:', error)
       return {
         success: false,
-        message: 'Error claiming daily bonus'
+        message: `Error claiming daily bonus: ${error.message || 'Unknown error'}`
       }
     }
   }
@@ -137,9 +173,14 @@ class DailyBonusService {
   // Get current streak from database
   getCurrentStreak() {
     try {
-      const userData = dataService.getUserData()
+      // Prioritize Telegram user data
+      let userData = telegramWebAppService.getUserData()
+      if (!userData) {
+        userData = dataService.getUserData()
+      }
       return userData?.streak || 0
     } catch (error) {
+      console.log('⚠️ Error getting streak, using default:', error)
       return 0
     }
   }
@@ -156,7 +197,12 @@ class DailyBonusService {
   // Get cooldown time until next bonus
   getCooldownTime() {
     try {
-      const userData = dataService.getUserData()
+      // Prioritize Telegram user data
+      let userData = telegramWebAppService.getUserData()
+      if (!userData) {
+        userData = dataService.getUserData()
+      }
+      
       const lastClaim = userData?.lastBonusClaim
       
       if (!lastClaim) return null
@@ -176,6 +222,7 @@ class DailyBonusService {
       
       return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
     } catch (error) {
+      console.log('⚠️ Error getting cooldown time:', error)
       return null
     }
   }

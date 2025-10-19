@@ -37,6 +37,20 @@ const Profile = () => {
     return () => clearInterval(interval)
   }, [])
 
+  // Close network dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showNetworkDropdown && !event.target.closest('.network-dropdown-container')) {
+        setShowNetworkDropdown(false)
+      }
+    }
+
+    if (showNetworkDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showNetworkDropdown])
+
   const loadData = async () => {
     try {
       // Check if we have Telegram user data first
@@ -625,8 +639,8 @@ const Profile = () => {
 
       {/* Deposit Modal */}
       {showDepositModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-primary-dark rounded-lg shadow-xl w-full max-w-sm max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-primary-dark rounded-lg shadow-xl w-full max-w-sm max-h-[95vh] overflow-y-auto">
             <div className="px-4 py-3 border-b border-gray-700">
               <h3 className="text-sm font-bold text-white">Deposit USDT</h3>
             </div>
@@ -709,33 +723,36 @@ const Profile = () => {
               </div>
 
               <div>
-                <label className="block text-gray-300 text-xs mb-1">Network</label>
-                <div className="relative">
+                <label className="block text-gray-300 text-xs mb-1">Network <span className="text-red-400">*</span></label>
+                <div className="relative network-dropdown-container">
                   <button
                     type="button"
-                    onClick={() => setShowNetworkDropdown(!showNetworkDropdown)}
-                    className="w-full p-2 text-sm bg-primary-dark border border-gray-600 rounded text-white focus:border-primary-accent focus:outline-none flex items-center justify-between"
+                    onClick={() => {
+                      console.log('🌐 Network dropdown clicked, available networks:', availableNetworks)
+                      setShowNetworkDropdown(!showNetworkDropdown)
+                    }}
+                    className="w-full p-3 text-sm bg-primary-dark border border-gray-600 rounded-lg text-white focus:border-primary-accent focus:outline-none flex items-center justify-between min-h-[44px]"
                     disabled={availableNetworks.length === 0}
                   >
                     <span className="flex items-center space-x-2">
                       {selectedNetwork ? (
                         <>
-                          <span className="text-sm">{walletService.getNetworkInfo(selectedNetwork).icon}</span>
-                          <span className={`text-xs ${walletService.getNetworkInfo(selectedNetwork).color}`}>
+                          <span className="text-lg">{walletService.getNetworkInfo(selectedNetwork).icon}</span>
+                          <span className={`text-sm font-medium ${walletService.getNetworkInfo(selectedNetwork).color}`}>
                             {walletService.getNetworkInfo(selectedNetwork).name}
                           </span>
                         </>
                       ) : (
-                        <span className="text-gray-400 text-xs">Select Network</span>
+                        <span className="text-gray-400 text-sm">Select Network</span>
                       )}
                     </span>
-                    <ChevronDown className="w-3 h-3" />
+                    <ChevronDown className={`w-4 h-4 transition-transform ${showNetworkDropdown ? 'rotate-180' : ''}`} />
                   </button>
                   
                   {showNetworkDropdown && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-primary-dark border border-gray-600 rounded shadow-lg z-10 max-h-32 overflow-y-auto">
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-primary-dark border border-gray-600 rounded-lg shadow-xl z-20 max-h-40 overflow-y-auto">
                       {availableNetworks.length === 0 ? (
-                        <div className="p-2 text-center text-gray-400 text-xs">
+                        <div className="p-3 text-center text-gray-400 text-sm">
                           No networks available
                         </div>
                       ) : (
@@ -745,12 +762,17 @@ const Profile = () => {
                             <button
                               key={network}
                               type="button"
-                              onClick={() => handleNetworkSelect(network)}
-                              className="w-full p-2 text-left hover:bg-gray-700 flex items-center space-x-2"
+                              onClick={() => {
+                                console.log('🌐 Network selected:', network)
+                                handleNetworkSelect(network)
+                                setShowNetworkDropdown(false)
+                              }}
+                              className="w-full p-3 text-left hover:bg-gray-700 flex items-center space-x-3 border-b border-gray-700 last:border-b-0"
                             >
-                              <span className="text-sm">{networkInfo.icon}</span>
-                              <div>
-                                <div className={`text-xs font-medium ${networkInfo.color}`}>{networkInfo.name}</div>
+                              <span className="text-lg">{networkInfo.icon}</span>
+                              <div className="flex-1">
+                                <div className={`text-sm font-medium ${networkInfo.color}`}>{networkInfo.name}</div>
+                                <div className="text-xs text-gray-400">{networkInfo.speed}</div>
                               </div>
                             </button>
                           )
@@ -759,48 +781,55 @@ const Profile = () => {
                     </div>
                   )}
                 </div>
+                <p className="text-gray-400 text-xs mt-1">
+                  Available networks: {availableNetworks.length}
+                </p>
               </div>
 
               <div>
                 <label className="block text-gray-300 text-xs mb-1">Deposit Address</label>
-                <div className="flex items-center space-x-1 p-2 bg-primary-dark border border-gray-600 rounded">
+                <div className="flex items-center space-x-2 p-3 bg-primary-dark border border-gray-600 rounded-lg">
                   <input
                     type="text"
-                    value={selectedWallet?.address || 'No address available'}
+                    value={selectedWallet?.address || 'Select a network to see address'}
                     readOnly
-                    className="flex-1 bg-transparent text-white text-xs"
+                    className="flex-1 bg-transparent text-white text-sm font-mono"
                     placeholder="Select a network to see address"
                   />
                   <button
-                    onClick={() => copyToClipboard(selectedWallet?.address || '')}
-                    className="p-1 hover:bg-gray-600 rounded"
+                    onClick={() => {
+                      if (selectedWallet?.address) {
+                        copyToClipboard(selectedWallet.address)
+                      }
+                    }}
+                    className="p-2 hover:bg-gray-600 rounded-lg transition-colors"
                     disabled={!selectedWallet?.address}
                   >
-                    <Copy className="w-3 h-3 text-gray-400" />
+                    <Copy className="w-4 h-4 text-gray-400" />
                   </button>
                 </div>
-                <p className="text-gray-400 text-xs mt-0.5">
+                <p className="text-gray-400 text-xs mt-1">
                   Send USDT to this address. Processing: {selectedWallet?.processingTime || '5-10 minutes'}
                 </p>
-                <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                <div className="mt-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                   <p className="text-yellow-400 text-xs">
                     <strong>Note:</strong> Your deposit will be pending until admin approval. You will be notified once approved.
                   </p>
                 </div>
               </div>
 
-              <div className="flex space-x-2 pt-2">
+              <div className="flex space-x-3 pt-4">
                 <button
                   onClick={() => setShowDepositModal(false)}
-                  className="flex-1 px-3 py-2 text-sm border border-gray-600 rounded text-gray-300 hover:bg-gray-700"
+                  className="flex-1 px-4 py-3 text-sm border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-700 transition-colors min-h-[44px]"
                   disabled={isProcessing}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDeposit}
-                  disabled={!depositAmount || !transactionId || !depositProof || isProcessing}
-                  className="flex-1 px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  disabled={!depositAmount || !transactionId || !depositProof || !selectedNetwork || isProcessing}
+                  className="flex-1 px-4 py-3 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[44px]"
                 >
                   {isProcessing ? 'Processing...' : 'Submit Request'}
                 </button>

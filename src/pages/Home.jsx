@@ -23,6 +23,8 @@ import dataService from '../services/dataService'
 import walletService from '../services/walletService'
 import appSettingsService from '../services/appSettingsService'
 import dailyBonusService from '../services/dailyBonusService'
+import telegramWebAppService from '../services/telegramWebAppService'
+import TelegramUserTest from '../components/TelegramUserTest'
 
 const Home = () => {
   const [userData, setUserData] = useState({})
@@ -41,12 +43,24 @@ const Home = () => {
 
   const loadData = async () => {
     try {
-      // Initialize dataService if not already initialized
-      if (!dataService.isInitialized) {
-        await dataService.initializeData()
+      // Check if we have Telegram user data first
+      const telegramUserData = telegramWebAppService.getUserData()
+      console.log('📱 Home - Telegram User Data:', telegramUserData)
+      
+      if (telegramUserData) {
+        // Use Telegram user data as primary source
+        setUserData(telegramUserData)
+        console.log('✅ Home - Using Telegram user data')
+      } else {
+        // Fallback to dataService
+        if (!dataService.isInitialized) {
+          await dataService.initializeData()
+        }
+        const serviceUserData = dataService.getUserData() || {}
+        setUserData(serviceUserData)
+        console.log('🔄 Home - Using dataService user data:', serviceUserData)
       }
       
-      setUserData(dataService.getUserData() || {})
       setRecentActivity(dataService.getRecentActivity ? dataService.getRecentActivity() : [])
       setAchievements(dataService.getAchievements ? dataService.getAchievements() : [])
       
@@ -434,6 +448,9 @@ const Home = () => {
             </div>
           </div>
         )}
+
+        {/* Telegram User Test */}
+        <TelegramUserTest />
       </div>
     </div>
   )

@@ -26,6 +26,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import telegramWebAppService from '../../services/telegramWebAppService';
+import adminDataService from '../../services/adminDataService';
 
 const AdminDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
@@ -41,89 +42,16 @@ const AdminDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      console.log('📊 Fetching dashboard data...');
       
-      // Try to fetch from API first
-      try {
-        const token = localStorage.getItem('accessToken');
-        const response = await fetch('/api/admin/dashboard', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          setDashboardData(result.data);
-          return;
-        }
-      } catch (apiError) {
-        console.log('API not available, using mock data');
-      }
-
-      // Fallback to mock data
-      const mockData = {
-        overview: {
-          users: {
-            totalUsers: 1250,
-            activeUsers: 890,
-            newUsers: 45,
-            telegramUsers: 320
-          },
-          revenue: {
-            totalRevenue: 12500,
-            dailyRevenue: 450,
-            monthlyRevenue: 8500,
-            pendingWithdrawals: 1200
-          },
-          quiz: {
-            totalQuizzes: 15600,
-            averageScore: 72.5,
-            completionRate: 85.2,
-            dailyQuizzes: 245
-          },
-          tournaments: {
-            totalTournaments: 245,
-            activeTournaments: 12,
-            totalParticipants: 1250,
-            totalPrizePool: 8500
-          },
-          dailyBonus: {
-            totalClaims: 3450,
-            claimsToday: 89,
-            totalDistributed: 1250.50,
-            averageStreak: 3.2,
-            topStreak: 15,
-            claimsThisWeek: 456,
-            claimsThisMonth: 1890
-          }
-        },
-        recent: {
-          users: [
-            { id: 1, name: 'John Doe', email: 'john@example.com', joinDate: '2024-01-15', status: 'active' },
-            { id: 2, name: 'Jane Smith', email: 'jane@example.com', joinDate: '2024-01-14', status: 'active' },
-            { id: 3, name: 'Bob Johnson', email: 'bob@example.com', joinDate: '2024-01-13', status: 'pending' }
-          ],
-          transactions: [
-            { id: 1, user: 'John Doe', amount: 50, type: 'deposit', status: 'completed', date: '2024-01-15' },
-            { id: 2, user: 'Jane Smith', amount: 25, type: 'withdrawal', status: 'pending', date: '2024-01-14' },
-            { id: 3, user: 'Bob Johnson', amount: 100, type: 'deposit', status: 'completed', date: '2024-01-13' }
-          ],
-          tournaments: [
-            { id: 1, name: 'Crypto Master', participants: 25, prizePool: 500, status: 'active' },
-            { id: 2, name: 'Quiz Champion', participants: 18, prizePool: 300, status: 'completed' },
-            { id: 3, name: 'Bitcoin Expert', participants: 32, prizePool: 750, status: 'active' }
-          ]
-        },
-        pending: {
-          withdrawals: 8,
-          verifications: 12,
-          supportTickets: 5,
-          tournamentApprovals: 3
-        }
-      };
-
-      setDashboardData(mockData);
+      // Initialize admin data service
+      await adminDataService.initialize();
+      
+      // Get real dashboard statistics
+      const stats = await adminDataService.getDashboardStats();
+      console.log('📊 Dashboard stats:', stats);
+      
+      setDashboardData(stats);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       setError('Failed to load dashboard data');

@@ -94,29 +94,49 @@ class MongoDBService {
   // User Management
   async getUserData() {
     try {
+      console.log('🔄 Fetching user data from MongoDB...');
+      
       // Check backend availability first
       await this.checkBackendAvailability();
       
-      // If backend is not available, return mock data
+      // If backend is not available, throw error
       if (!this.backendAvailable) {
-        console.log('Using mock user data (backend not available)');
-        return this.getMockUserData();
+        console.log('⚠️ Backend not available - cannot fetch user data');
+        throw new Error('Backend not available');
       }
+      
+      // Ensure we have a token
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        console.log('⚠️ No access token available');
+        throw new Error('No access token available');
+      }
+      
+      // Update axios headers with current token
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       
       const response = await axios.get('/users/profile');
       this.userData = response.data.data;
       
+      console.log('✅ User data fetched successfully from MongoDB:', this.userData);
       return this.userData;
     } catch (error) {
       // Check if it's a rate limiting error
       if (error.response && error.response.status === 429) {
-        console.log('Rate limited, using mock data temporarily');
-        return this.getMockUserData();
+        console.log('Rate limited, retrying later');
+        throw new Error('Rate limited - please try again later');
       }
       
-      console.error('Error fetching user data:', error);
-      // Return mock data for development
-      return this.getMockUserData();
+      // Check if it's an authentication error
+      if (error.response && error.response.status === 401) {
+        console.log('Authentication error - token may be invalid');
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        throw new Error('Authentication failed - please refresh the page');
+      }
+      
+      console.error('❌ Error fetching user data from MongoDB:', error);
+      throw error;
     }
   }
 
@@ -181,11 +201,22 @@ class MongoDBService {
   // Quiz Management
   async getQuestions(difficulty = 'easy', limit = 10) {
     try {
+      console.log(`🔄 Fetching ${limit} ${difficulty} questions from MongoDB...`);
+      
+      // Check backend availability first
+      await this.checkBackendAvailability();
+      
+      if (!this.backendAvailable) {
+        console.log('⚠️ Backend not available - cannot fetch questions');
+        throw new Error('Backend not available');
+      }
+      
       const response = await axios.get(`/quiz/questions?difficulty=${difficulty}&limit=${limit}`);
+      console.log(`✅ Questions fetched successfully from MongoDB: ${response.data.data.length} questions`);
       return response.data.data;
     } catch (error) {
-      console.error('Error fetching questions:', error);
-      return this.getMockQuestions(difficulty, limit);
+      console.error('❌ Error fetching questions from MongoDB:', error);
+      throw error;
     }
   }
 
@@ -202,15 +233,26 @@ class MongoDBService {
   // Tournament Management
   async getTournaments(status = 'active') {
     try {
+      console.log(`🔄 Fetching ${status} tournaments from MongoDB...`);
+      
+      // Check backend availability first
+      await this.checkBackendAvailability();
+      
+      if (!this.backendAvailable) {
+        console.log('⚠️ Backend not available - cannot fetch tournaments');
+        throw new Error('Backend not available');
+      }
+      
       // Check if we're in admin context
       const isAdmin = localStorage.getItem('adminAuthenticated') === 'true';
       const endpoint = isAdmin ? `/admin/tournaments?status=${status}` : `/tournaments?status=${status}`;
       
       const response = await axios.get(endpoint);
+      console.log(`✅ Tournaments fetched successfully from MongoDB: ${response.data.data.length} tournaments`);
       return response.data.data;
     } catch (error) {
-      console.error('Error fetching tournaments:', error);
-      return this.getMockTournaments();
+      console.error('❌ Error fetching tournaments from MongoDB:', error);
+      throw error;
     }
   }
 
@@ -237,11 +279,22 @@ class MongoDBService {
   // Transaction Management
   async getTransactions(type = 'all', limit = 20) {
     try {
+      console.log(`🔄 Fetching ${type} transactions from MongoDB...`);
+      
+      // Check backend availability first
+      await this.checkBackendAvailability();
+      
+      if (!this.backendAvailable) {
+        console.log('⚠️ Backend not available - cannot fetch transactions');
+        throw new Error('Backend not available');
+      }
+      
       const response = await axios.get(`/transactions?type=${type}&limit=${limit}`);
+      console.log(`✅ Transactions fetched successfully from MongoDB: ${response.data.data.length} transactions`);
       return response.data.data;
     } catch (error) {
-      console.error('Error fetching transactions:', error);
-      return this.getMockTransactions();
+      console.error('❌ Error fetching transactions from MongoDB:', error);
+      throw error;
     }
   }
 
